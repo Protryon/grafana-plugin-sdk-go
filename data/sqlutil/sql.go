@@ -2,10 +2,13 @@ package sqlutil
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 )
+
+type ConverterGenerator = func(colType *sql.ColumnType) (Converter, error)
 
 // FrameFromRows returns a new Frame populated with the data from rows. The field types
 // will be nullable ([]*T) if the SQL column is nullable or if the nullable property is unknown.
@@ -19,10 +22,24 @@ import (
 // A converter must be supplied in order to support data types that are scanned from sql.Rows, but not supported in data.Frame.
 // The converter defines what type to use for scanning, what type to place in the data frame, and a function for converting from one to the other.
 // If you find yourself here after upgrading, you can continue to your StringConverters here by using the `ToConverters` function.
-func FrameFromRows(rows *sql.Rows, rowLimit int64, converters ...Converter) (*data.Frame, error) {
+func FrameFromRows(rows *sql.Rows, rowLimit int64, converterGenerator *ConverterGenerator, converters ...Converter) (*data.Frame, error) {
 	types, err := rows.ColumnTypes()
 	if err != nil {
 		return nil, err
+	}
+
+	if converterGenerator != nil {
+		if len(converters) != 0 {
+			return nil, errors.New("cannot have manual converters mixed with converter generator")
+		}
+
+		for _, type_ := range types {
+			converter, err := (*converterGenerator)(type_)
+			if err != nil {
+				return nil, err
+			}
+			converters = append(converters, converter)
+		}
 	}
 
 	if isDynamic(converters) {

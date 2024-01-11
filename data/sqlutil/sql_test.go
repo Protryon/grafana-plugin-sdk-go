@@ -342,7 +342,7 @@ func TestFrameFromRows(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			frame, err := sqlutil.FrameFromRows(tt.rows, tt.rowLimit, tt.converters...)
+			frame, err := sqlutil.FrameFromRows(tt.rows, tt.rowLimit, nil, tt.converters...)
 			if tt.err {
 				require.Error(t, err)
 			} else {
